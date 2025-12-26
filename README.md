@@ -98,7 +98,7 @@ The `app_id` is automatically sanitized to remove invalid path characters (`/`, 
 
 ## License
 
-This project is open source. Feel free to use, modify, and distribute.
+This project is licensed under the [MIT License](LICENSE).
 
 ## Contributing
 
