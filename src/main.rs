@@ -17,6 +17,14 @@ struct Args {
     /// Application title (displayed in the UI, defaults to app_id)
     #[arg(short, long)]
     title: Option<String>,
+
+    /// Environment variable name to set with the selected profile name
+    #[arg(short, long)]
+    env_var: Option<String>,
+
+    /// Program to execute after profile selection (full path)
+    #[arg(short, long)]
+    program: Option<String>,
 }
 
 fn main() -> eframe::Result<()> {
@@ -35,6 +43,12 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         &format!("Profile Manager - {}", app_title),
         options,
-        Box::new(move |_cc| Ok(Box::new(ProfileApp::new(app_title.clone())))),
+        Box::new(move |_cc| {
+            Ok(Box::new(ProfileApp::new(
+                app_title.clone(),
+                args.env_var.clone(),
+                args.program.clone(),
+            )))
+        }),
     )
 }

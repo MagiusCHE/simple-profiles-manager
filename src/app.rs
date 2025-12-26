@@ -1,3 +1,5 @@
+use std::process::Command;
+
 use eframe::egui::{self, Color32, FontId, RichText, Rounding, Stroke, Vec2};
 
 use crate::profile::Profile;
@@ -18,10 +20,13 @@ pub struct ProfileApp {
     profile_name_input: String,
     profile_selected: bool,
     focus_input: bool,
+    env_var: Option<String>,
+    program: Option<String>,
+    should_exit: bool,
 }
 
 impl ProfileApp {
-    pub fn new(app_title: String) -> Self {
+    pub fn new(app_title: String, env_var: Option<String>, program: Option<String>) -> Self {
         let mut profiles = storage::load_profiles();
         profiles.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
         let selected_name = storage::load_selected_profile();
@@ -50,6 +55,18 @@ impl ProfileApp {
             profile_name_input: String::new(),
             profile_selected: false,
             focus_input,
+            env_var,
+            program,
+            should_exit: false,
+        }
+    }
+
+    fn launch_program_and_exit(&mut self, profile_name: &str) {
+        if let (Some(env_var), Some(program)) = (&self.env_var, &self.program) {
+            let _ = Command::new(program)
+                .env(env_var, profile_name)
+                .spawn();
+            self.should_exit = true;
         }
     }
 
@@ -189,8 +206,13 @@ impl ProfileApp {
                 .clicked()
                 {
                     if let Some(profile) = self.get_selected_profile() {
-                        storage::save_selected_profile(&profile.name);
-                        self.profile_selected = true;
+                        let profile_name = profile.name.clone();
+                        storage::save_selected_profile(&profile_name);
+                        if self.env_var.is_some() && self.program.is_some() {
+                            self.launch_program_and_exit(&profile_name);
+                        } else {
+                            self.profile_selected = true;
+                        }
                     }
                 }
             });
@@ -470,6 +492,11 @@ fn styled_button(ui: &mut egui::Ui, text: &str, color: Color32, size: Vec2) -> e
 impl eframe::App for ProfileApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.set_visuals(egui::Visuals::dark());
+
+        if self.should_exit {
+            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+            return;
+        }
 
         if self.profile_selected {
             egui::CentralPanel::default().show(ctx, |ui| {
