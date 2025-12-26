@@ -22,7 +22,8 @@ pub struct ProfileApp {
 
 impl ProfileApp {
     pub fn new(app_title: String) -> Self {
-        let profiles = storage::load_profiles();
+        let mut profiles = storage::load_profiles();
+        profiles.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
         let selected_name = storage::load_selected_profile();
 
         let selected_index = if profiles.is_empty() {
@@ -214,6 +215,8 @@ impl ProfileApp {
 
         ui.add_space(30.0);
 
+        let mut should_create = false;
+
         egui::Frame::none()
             .fill(Color32::from_rgb(35, 35, 40))
             .rounding(Rounding::same(8.0))
@@ -234,6 +237,9 @@ impl ProfileApp {
                         response.request_focus();
                         self.focus_input = false;
                     }
+                    if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        should_create = true;
+                    }
                 });
             });
 
@@ -244,6 +250,12 @@ impl ProfileApp {
             .profiles
             .iter()
             .any(|p| p.name == self.profile_name_input.trim());
+        let create_enabled = name_valid && !name_exists;
+
+        if should_create && create_enabled {
+            self.create_profile();
+            return;
+        }
 
         if name_exists {
             ui.vertical_centered(|ui| {
@@ -264,7 +276,6 @@ impl ProfileApp {
         let available_width = ui.available_width();
         let offset = (available_width - total_width) / 2.0;
 
-        let create_enabled = name_valid && !name_exists;
         let create_color = if create_enabled {
             Color32::from_rgb(80, 160, 80)
         } else {
@@ -299,14 +310,30 @@ impl ProfileApp {
                 )
                 .clicked()
             {
-                let profile = Profile::new(self.profile_name_input.trim().to_string());
-                self.profiles.push(profile);
-                self.save_profiles();
-                self.selected_index = Some(self.profiles.len() - 1);
-                self.profile_name_input.clear();
-                self.state = AppState::ProfileList;
+                self.create_profile();
             }
         });
+    }
+
+    fn create_profile(&mut self) {
+        let name = self.profile_name_input.trim().to_string();
+        let profile = Profile::new(name.clone());
+        self.profiles.push(profile);
+        self.profiles.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        self.save_profiles();
+        self.selected_index = self.profiles.iter().position(|p| p.name == name);
+        self.profile_name_input.clear();
+        self.state = AppState::ProfileList;
+    }
+
+    fn save_edited_profile(&mut self, edit_index: usize) {
+        let name = self.profile_name_input.trim().to_string();
+        self.profiles[edit_index].name = name.clone();
+        self.profiles.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        self.save_profiles();
+        self.selected_index = self.profiles.iter().position(|p| p.name == name);
+        self.profile_name_input.clear();
+        self.state = AppState::ProfileList;
     }
 
     fn render_edit_profile(&mut self, ui: &mut egui::Ui, edit_index: usize) {
@@ -326,6 +353,8 @@ impl ProfileApp {
         });
 
         ui.add_space(30.0);
+
+        let mut should_save = false;
 
         egui::Frame::none()
             .fill(Color32::from_rgb(35, 35, 40))
@@ -347,6 +376,9 @@ impl ProfileApp {
                         response.request_focus();
                         self.focus_input = false;
                     }
+                    if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        should_save = true;
+                    }
                 });
             });
 
@@ -360,6 +392,12 @@ impl ProfileApp {
                 .profiles
                 .iter()
                 .any(|p| p.name == self.profile_name_input.trim());
+        let save_enabled = name_valid && !name_exists;
+
+        if should_save && save_enabled {
+            self.save_edited_profile(edit_index);
+            return;
+        }
 
         if name_exists {
             ui.vertical_centered(|ui| {
@@ -378,7 +416,6 @@ impl ProfileApp {
         let available_width = ui.available_width();
         let offset = (available_width - total_width) / 2.0;
 
-        let save_enabled = name_valid && !name_exists;
         let save_color = if save_enabled {
             Color32::from_rgb(80, 130, 180)
         } else {
@@ -410,10 +447,7 @@ impl ProfileApp {
                 )
                 .clicked()
             {
-                self.profiles[edit_index].name = self.profile_name_input.trim().to_string();
-                self.save_profiles();
-                self.profile_name_input.clear();
-                self.state = AppState::ProfileList;
+                self.save_edited_profile(edit_index);
             }
         });
     }
